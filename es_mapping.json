@@ -1,0 +1,39 @@
+{
+  "settings":{
+     "index":{
+        "analysis":{
+           "analyzer":{
+              "my_ngram_analyzer":{
+                "tokenizer":"my_ngram_tokenizer"
+              }
+           },
+           "tokenizer":{
+              "my_ngram_tokenizer":{
+                 "type":"nGram",
+                  "min_gram": 5,
+                  "max_gram": 5,
+                  "token_chars":[
+                    "letter",
+                    "digit"
+                  ]
+              }
+           }
+        }
+     }
+  },
+  "mappings": {
+    "class": {
+      "properties": {
+        "ontology": {"type": "keyword"},
+        "class_name": {"type": "text", "analyzer":"my_ngram_analyzer"},
+        "class_name_exact": {"type": "keyword"},
+        "prefLabel": {"type": "text", "analyzer":"my_ngram_analyzer"},
+        "prefLabel_exact": {"type": "keyword"},
+        "qname": {"type": "text", "analyzer":"my_ngram_analyzer"},
+        "qname_exact": {"type": "keyword"},
+        "notation": {"type": "text", "analyzer":"my_ngram_analyzer"},
+        "notation_exact": {"type": "keyword"}
+      }
+    }
+  }
+}

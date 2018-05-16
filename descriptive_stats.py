@@ -19,7 +19,7 @@ def get_keys_iter(database, client):
             if 'class' in d:
                 yield d['class'], d['sample_id']
     else:
-        return []
+        yield None, None
 
 
 def get_ebi_values_per_field(field, ebi):

@@ -41,9 +41,13 @@ def read_ontology(es, filename, pref_label, notation):
                 doc['notation_exact'] = n
             # TODO what about other literals: rdfs:label, dct:title
             index_id = qname
-            res = es.index(index="biodata", doc_type='class', id=index_id, body=doc)
-            if i % 10000 == 0:
-                print('inserted docs: ' + str(i))
+
+            res_exists = es.exists(index="biodata", doc_type='class', id=index_id)
+
+            if not res_exists:
+                res = es.index(index="biodata", doc_type='class', id=index_id, body=doc)
+                if i % 10000 == 0:
+                    print('inserted docs: ' + str(i))
     except Exception as e:
         print(e)
 

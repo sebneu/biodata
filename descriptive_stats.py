@@ -47,7 +47,7 @@ def get_values_per_fields(database, client):
             values = get_ebi_values_per_field(d['_id'], db)
             yield d['_id'], values
     else:
-        return []
+        yield None, []
 
 
 # usage of metadata keys
@@ -65,9 +65,6 @@ def usage(database, client):
         i += 1
         if i % 1000000 == 0:
             print('processed: ' + str(i))
-        # TODO remove
-        if i > 2000000:
-            break
 
     print('total keys: ' + str(len(total_keys)))
 

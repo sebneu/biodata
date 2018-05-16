@@ -54,8 +54,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     es = Elasticsearch([{"host": args.host, "port": args.port}])
-    for filename in os.listdir('ontologies'):
-        if os.path.isfile('ontologies/' + filename):
+    for filename in os.listdir('ontologies/all'):
+        if os.path.isfile('ontologies/all/' + filename):
             print('Ontology: ' + filename)
             pref_label = 'ontologies/filter/prefLabel_' + filename + '.hdt.nt'
             notation = 'ontologies/filter/notation_' + filename + '.hdt.nt'

@@ -172,8 +172,7 @@ def metadata_ontology_mapping(database, client, es):
             csvw.writerow(line)
 
 
-def get_trainingdata_features(field, ontologies, client, es):
-    values = get_ncbi_values_per_field(field, client.ncbi)
+def get_trainingdata_features(field, values, ontologies, es):
     num_values = len(values)
     exact = 0
     match = 0
@@ -182,10 +181,14 @@ def get_trainingdata_features(field, ontologies, client, es):
     numbers_exact = 0.0
     numbers_match = 0.0
 
+    ontologies_exact = defaultdict(int)
+    ontologies_match = defaultdict(int)
+
     for v in values:
         if v:
             mo = find_matching_ontologies(v, es, ontology=ontologies)
             if len(mo) > 0:
+                ontologies_match[mo[0]] += 1
                 match += 1
                 distinct_match.add(v)
                 numbers = sum(c.isdigit() for c in v)
@@ -193,6 +196,7 @@ def get_trainingdata_features(field, ontologies, client, es):
 
             eo = find_exact_mapping(v, es, ontology=ontologies)
             if len(eo) > 0:
+                ontologies_exact[eo[0]] += 1
                 exact += 1
                 distinct_exact.add(v)
                 numbers = sum(c.isdigit() for c in v)
@@ -201,7 +205,23 @@ def get_trainingdata_features(field, ontologies, client, es):
     numbers_exact = numbers_exact/ num_values
     numbers_match = numbers_match / num_values
 
-    return [field, num_values, exact, exact / float(num_values), len(distinct_exact), numbers_exact, match, match / float(num_values), len(distinct_match), numbers_match]
+    sorted_eo = sorted(ontologies_exact.items(), key=operator.itemgetter(1), reverse=True)
+    sorted_mo = sorted(ontologies_match.items(), key=operator.itemgetter(1), reverse=True)
+    ontology_count_exact = ''
+    ontology_exact = ''
+    ontology_count_match = ''
+    ontology_match = ''
+    if len(sorted_eo) > 0:
+        ontology_exact = sorted_eo[0][0]
+        ontology_count_exact = sorted_eo[0][1]
+    if len(sorted_mo) > 0:
+        ontology_match = sorted_mo[0][0]
+        ontology_count_match = sorted_mo[0][1]
+
+    return [field, num_values, exact, exact / float(num_values), len(distinct_exact),
+            numbers_exact, ontology_exact, ontology_count_exact,
+            match, match / float(num_values), len(distinct_match),
+            numbers_match, ontology_match, ontology_count_match]
 
 
 
@@ -224,11 +244,29 @@ def get_trainingdata_values(client, es):
     # ratio of numbers/letters
     with open('results/attribute_mappings_features.csv', 'w') as f:
         csvw = csv.writer(f)
-        csvw.writerow(['field', 'total_values', 'exact', 'perc_exact', 'distinct_exact', 'avg_numbers_exact', 'match', 'perc_match', 'distinct_match', 'avg_numbers_match'])
+        csvw.writerow(['field', 'total_values', 'exact', 'perc_exact', 'distinct_exact',
+                       'avg_numbers_exact', 'ontology_exact', 'ontology_count_exact',
+                       'match', 'perc_match', 'distinct_match',
+                       'avg_numbers_match', 'ontology_match', 'ontology_count_match'])
 
         for field in assigned_ontologies:
             print('Processing attribute: ' + field + ', ' + '|'.join(assigned_ontologies[field]))
-            row = get_trainingdata_features(field, assigned_ontologies[field], client, es)
+            values = get_ncbi_values_per_field(field, client.ncbi)
+            row = get_trainingdata_features(field, values, assigned_ontologies[field], es)
+            csvw.writerow(row)
+
+
+def get_all_field_values(client, es, database='ncbi'):
+    filename = 'results/' + database + '_attributes_features.csv'
+    with open(filename, 'w') as f:
+        csvw = csv.writer(f)
+        csvw.writerow(['field', 'total_values', 'exact', 'perc_exact', 'distinct_exact', 'avg_numbers_exact', 'ontology_exact', 'ontology_count_exact', 'match', 'perc_match', 'distinct_match', 'avg_numbers_match', 'ontology_match', 'ontology_count_match'])
+
+    for field, values in get_values_per_fields(database, client):
+        print('Processing attribute: ' + field)
+        row = get_trainingdata_features(field, values, None, es)
+        with open(filename, 'a') as f:
+            csvw = csv.writer(f)
             csvw.writerow(row)
 
 
@@ -243,5 +281,5 @@ if __name__ == '__main__':
 
     #usage('ncbi', client)
     #metadata_ontology_mapping('ncbi', client, es)
-    get_trainingdata_values(client, es)
-
+    #get_trainingdata_values(client, es)
+    get_all_field_values(client, es)

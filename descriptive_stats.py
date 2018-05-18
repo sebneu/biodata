@@ -1,6 +1,7 @@
 import operator
 from collections import defaultdict
 import csv
+import argparse
 
 import math
 from pymongo import MongoClient
@@ -174,6 +175,7 @@ def metadata_ontology_mapping(database, client, es):
 
 def get_trainingdata_features(field, values, ontologies, es):
     num_values = len(values)
+    distinct_values = len(set(values))
     exact = 0
     match = 0
     distinct_exact = set()
@@ -218,15 +220,13 @@ def get_trainingdata_features(field, values, ontologies, es):
         ontology_match = sorted_mo[0][0]
         ontology_count_match = sorted_mo[0][1]
 
-    return [field, num_values, exact, exact / float(num_values), len(distinct_exact),
+    return [field, num_values, distinct_values, exact, exact / float(num_values), len(distinct_exact),
             numbers_exact, ontology_exact, ontology_count_exact,
             match, match / float(num_values), len(distinct_match),
             numbers_match, ontology_match, ontology_count_match]
 
 
-
-
-def get_trainingdata_values(client, es):
+def get_ontology_mappings():
     assigned_ontologies = {}
     with open('metadata/attributes.csv', 'r') as f:
         csvr = csv.reader(f)
@@ -235,6 +235,11 @@ def get_trainingdata_values(client, es):
                 field = row[0]
                 ontologies = row[2].split('|')
                 assigned_ontologies[field] = ontologies
+    return assigned_ontologies
+
+
+def get_trainingdata_values(client, es):
+    assigned_ontologies = get_ontology_mappings()
     # get features:
     # num of values
     # selectivity
@@ -244,7 +249,7 @@ def get_trainingdata_values(client, es):
     # ratio of numbers/letters
     with open('results/attribute_mappings_features.csv', 'w') as f:
         csvw = csv.writer(f)
-        csvw.writerow(['field', 'total_values', 'exact', 'perc_exact', 'distinct_exact',
+        csvw.writerow(['field', 'total_values', 'distinct_values', 'exact', 'perc_exact', 'distinct_exact',
                        'avg_numbers_exact', 'ontology_exact', 'ontology_count_exact',
                        'match', 'perc_match', 'distinct_match',
                        'avg_numbers_match', 'ontology_match', 'ontology_count_match'])
@@ -260,7 +265,7 @@ def get_all_field_values(client, es, database='ncbi'):
     filename = 'results/' + database + '_attributes_features.csv'
     with open(filename, 'w') as f:
         csvw = csv.writer(f)
-        csvw.writerow(['field', 'total_values', 'exact', 'perc_exact', 'distinct_exact', 'avg_numbers_exact', 'ontology_exact', 'ontology_count_exact', 'match', 'perc_match', 'distinct_match', 'avg_numbers_match', 'ontology_match', 'ontology_count_match'])
+        csvw.writerow(['field', 'total_values', 'distinct_values', 'exact', 'perc_exact', 'distinct_exact', 'avg_numbers_exact', 'ontology_exact', 'ontology_count_exact', 'match', 'perc_match', 'distinct_match', 'avg_numbers_match', 'ontology_match', 'ontology_count_match'])
 
     for field, values in get_values_per_fields(database, client):
         print('Processing attribute: ' + field)
@@ -270,16 +275,62 @@ def get_all_field_values(client, es, database='ncbi'):
             csvw.writerow(row)
 
 
-if __name__ == '__main__':
-    host = 'localhost'
-    port = 27017
-    eshost = 'localhost'
-    esport = 9200
+def get_distinct_values(client, es, database='ncbi'):
+    assigned_ontologies = get_ontology_mappings()
 
-    client = MongoClient(host, port)
-    es = Elasticsearch([{"host": eshost, "port": esport}])
+    with open('results/distinct_attribute_values.csv', 'w') as f:
+        csvw = csv.writer(f)
+        csvw.writerow(['field', 'total_values', 'distinct_values'])
+
+        for field in assigned_ontologies:
+            print('Processing attribute: ' + field)
+            values = get_ncbi_values_per_field(field, client.ncbi)
+            row = [field, str(len(values)), str(len(set(values)))]
+            csvw.writerow(row)
+
+    filename = 'results/distinct_' + database + '_attributes_values.csv'
+    with open(filename, 'w') as f:
+        csvw = csv.writer(f)
+        csvw.writerow(['field', 'total_values', 'distinct_values'])
+
+    for field, values in get_values_per_fields(database, client):
+        print('Processing attribute: ' + field)
+        row = [field, str(len(values)), str(len(set(values)))]
+        with open(filename, 'a') as f:
+            csvw = csv.writer(f)
+            csvw.writerow(row)
+
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(prog='Indexing and experiments over bioportal data')
+    parser.add_argument('--eshost', default='localhost')
+    parser.add_argument('--esport', type=int, default=9200)
+    parser.add_argument('--mongohost', default='localhost')
+    parser.add_argument('--mongoport', type=int, default=27017)
+
+    subparsers = parser.add_subparsers(help='Get features for all fields')
+    # create the parser for the "start" command
+    parser_articles = subparsers.add_parser('all-fields')
+    parser_articles.set_defaults(func=get_all_field_values)
+
+    parser_articles = subparsers.add_parser('mapping-fields')
+    parser_articles.set_defaults(func=get_trainingdata_values)
+
+    parser_articles = subparsers.add_parser('distinct-values')
+    parser_articles.set_defaults(func=get_distinct_values)
+
+
+    # parse arguments
+    args = parser.parse_args()
+
+    client = MongoClient(args.mongohost, args.mongoport)
+    es = Elasticsearch([{"host": args.eshost, "port": args.esport}])
+
+    args.func(client, es)
 
     #usage('ncbi', client)
     #metadata_ontology_mapping('ncbi', client, es)
     #get_trainingdata_values(client, es)
-    get_all_field_values(client, es)
+    #get_all_field_values(client, es)
+
